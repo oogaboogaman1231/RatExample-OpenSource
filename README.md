@@ -1,24 +1,26 @@
 # Remote Access Tool (RAT) Server
 
-This project provides a simple Remote Access Tool (RAT) server written in C++ for managing remote computers.
+## Download and Installation
+
+1. **Download the Installer:**
+   - [Download install.bat](install.bat)
+
+2. **Run the Installer:**
+   - Double-click the downloaded `install.bat` file to run it.
+   - The installer will automatically download the repository content, copy files to the `%APPDATA%` directory, and create a shortcut in the Start Menu.
+
+## How it Works
+
+This RAT server provides a simple way to manage remote computers using TCP and UDP communication protocols. It includes a graphical user interface (GUI) for easy interaction and basic client management features such as shutdown, reboot, and file upload.
 
 ## Usage
 
-1. **Download the files:**
-   - Download the `rat_server.cpp` file and the `main.bat` file from this repository.
+1. **Run the Server:**
+   - After installation, locate and double-click the "RatExample" shortcut in the Start Menu to run the server.
+   - The server will start listening for incoming connections from clients.
 
-2. **Create a folder:**
-   - Create a new folder on your Windows computer.
-
-3. **Copy files to the folder:**
-   - Copy the downloaded `rat_server.cpp` and `main.bat` files into the folder.
-
-4. **Run the setup script:**
-   - Double-click the `main.bat` file to run it.
-
-5. **Wait for the magic:**
-   - The setup script will automatically install the necessary dependencies, compile the RAT server code, and run the server.
-   - Once the server is running, it will start listening for incoming connections from clients.
+2. **Manage Clients:**
+   - Use the GUI interface to view connected clients and perform actions such as shutdown, reboot, and file upload.
 
 ## Legal Disclaimer
 

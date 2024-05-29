@@ -1,27 +1,84 @@
-# Remote Access Tool (RAT) Server
+# Remote Access Tool
 
-## Download and Installation
+## Overview
+This project is a remote access tool that allows you to control a remote computer. It supports various features such as remote desktop viewing, password recovery, and supports dynamic DNS services like ngrok and No-IP.
 
-1. **Download the Installer:**
-   - [Download install.bat](install.bat)
+## Features
+- Remote Desktop (Live screen footage)
+- Password Recovery (Retrieve stored passwords)
+- TCP and UDP server support
+- Dynamic DNS support with ngrok and No-IP
+- Customizable build options for the agent
+- Options to start on startup, hide in specific directories, and use mutexes
 
-2. **Run the Installer:**
-   - Double-click the downloaded `install.bat` file to run it.
-   - The installer will automatically download the repository content, copy files to the `%APPDATA%` directory, and create a shortcut in the Start Menu.
+## Requirements
+- Windows operating system
+- Visual Studio or any compatible C++ development environment
+- [Msftedit.dll](https://docs.microsoft.com/en-us/windows/win32/api/richedit/) for RichEdit control (part of Windows OS)
 
-## How it Works
+## Installation
+-First [Download install.bat](install.bat), then run it
+-Wait for it to do it´s thing
 
-This RAT server provides a simple way to manage remote computers using TCP and UDP communication protocols. It includes a graphical user interface (GUI) for easy interaction and basic client management features such as shutdown, reboot, and file upload.
+## Running the Application
+-After running the install.bat script, a shortcut named "RAT Server" will be created on your desktop. You can use this shortcut to run the server.
+
+## Ngrok Setup
+-Sign up for an ngrok account and get your auth token.
+-Enter your ngrok auth token in the respective field in the GUI.
+
+## No-IP Setup
+-Sign up for a No-IP account.
+-Create a hostname and get your No-IP credentials.
+-Enter your No-IP username, password, and hostname in the respective fields in the GUI.
 
 ## Usage
+-Configure the server and agent settings using the GUI.
+-Start the server.
+-Build and deploy the agent to the target machine.
+-Control the agent from the server interface.
 
-1. **Run the Server:**
-   - After installation, locate and double-click the "RatExample" shortcut in the Start Menu to run the server.
-   - The server will start listening for incoming connections from clients.
+# Changelog
 
-2. **Manage Clients:**
-   - Use the GUI interface to view connected clients and perform actions such as shutdown, reboot, and file upload.
+## [V1.1.0] - FIRST OFICIAL ALPHA - 2024-05-28
 
-## Legal Disclaimer
+### Added
+- Implemented `install.bat` script for easy installation and setup.
+- Created desktop shortcut for convenient access to the server.
+- Added troubleshooting section to `README.md` for common issues and solutions.
 
-Unauthorized use of RATs is illegal and unethical. This software is provided for educational purposes only. Use at your own risk.
+### Updated
+- Updated `README.md` with installation instructions and usage details.
+- Enhanced the GUI with ngrok and No-IP setup options.
+- Improved build process to compile the executable automatically during installation.
+
+### Removed
+- Removed `main.bat` as it is no longer needed with the introduction of `install.bat`.
+
+# Troubleshooting
+
+If you encounter any issues while using the Remote Access Tool, you can refer to the following troubleshooting steps:
+
+## 1. Compilation Errors
+- **Issue:** If you encounter compilation errors when running `install.bat`, ensure that you have the necessary dependencies installed and that your compiler path is correctly set.
+- **Solution:** Double-check your compiler setup and ensure that all required libraries are properly linked.
+
+## 2. Missing Dependencies
+- **Issue:** If the application fails to run due to missing dependencies, such as `ws2_32.lib` or `Comctl32.lib`, make sure these libraries are included in your project and properly linked during compilation.
+- **Solution:** Verify that the necessary libraries are present in your project and correctly configured in your compiler settings.
+
+## 3. Desktop Shortcut Not Created
+- **Issue:** If the desktop shortcut is not created after running `install.bat`, check if the script encountered any errors during execution.
+- **Solution:** Review the output of the `install.bat` script for any error messages. Ensure that the script has sufficient permissions to create shortcuts on the desktop.
+
+## 4. GUI Not Displayed
+- **Issue:** If the GUI fails to display after running the server, check if there are any issues with the graphical interface libraries or system configurations.
+- **Solution:** Verify that your system meets the requirements for running the Remote Access Tool and ensure that all necessary dependencies are properly installed.
+
+If you are unable to resolve your issue using the troubleshooting steps provided above, please feel free to open an [issue]([https://github.com/yourusername/remote-access-tool/issues](https://github.com/oogaboogaman1231/RatExample-OpenSource/issues)) on the GitHub repository, providing detailed information about the problem you encountered. Our team will assist you in resolving the issue as soon as possible.
+
+##Legal Disclaimer
+This tool is intended for legal use only. Unauthorized access to computer systems is illegal and punishable by law. Always obtain explicit permission before accessing or controlling a computer that you do not own. The author is not responsible for any misuse of this tool.
+
+## License
+This project is licensed under the MIT License.

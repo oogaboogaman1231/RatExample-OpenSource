@@ -1,5 +1,5 @@
 # Remote Access Tool
-
+# CODE IS INCOMPLETE AND WONT WORK!!
 ## Overview
 This project is a remote access tool that allows you to control a remote computer. It supports various features such as remote desktop viewing, password recovery, and supports dynamic DNS services like ngrok and No-IP.
 
@@ -17,8 +17,10 @@ This project is a remote access tool that allows you to control a remote compute
 - [Msftedit.dll](https://docs.microsoft.com/en-us/windows/win32/api/richedit/) for RichEdit control (part of Windows OS)
 
 ## Installation
+CODE IS INCOMPLETE FOR NOW!! WONT WORK!!
 -First [download the installer](installer.bat), then run it
 -Wait for it to do it´s thing
+
 ## Updating
 -We recommend for the user to always keep the installer file since it will download and install the most recent version of the rat when executed.
 

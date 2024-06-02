@@ -17,7 +17,7 @@ This project is a remote access tool that allows you to control a remote compute
 - [Msftedit.dll](https://docs.microsoft.com/en-us/windows/win32/api/richedit/) for RichEdit control (part of Windows OS)
 
 ## Installation
--First [Download install.bat](install.bat), then run it
+-First download the latest version for the project on the releases tab located on the right, then run it
 -Wait for it to do it´s thing
 
 ## Running the Application
@@ -37,23 +37,6 @@ This project is a remote access tool that allows you to control a remote compute
 -Start the server.
 -Build and deploy the agent to the target machine.
 -Control the agent from the server interface.
-
-# Changelog
-
-## [V1.1.0] - FIRST OFICIAL ALPHA - 2024-05-28
-
-### Added
-- Implemented `install.bat` script for easy installation and setup.
-- Created desktop shortcut for convenient access to the server.
-- Added troubleshooting section to `README.md` for common issues and solutions.
-
-### Updated
-- Updated `README.md` with installation instructions and usage details.
-- Enhanced the GUI with ngrok and No-IP setup options.
-- Improved build process to compile the executable automatically during installation.
-
-### Removed
-- Removed `main.bat` as it is no longer needed with the introduction of `install.bat`.
 
 # Troubleshooting
 

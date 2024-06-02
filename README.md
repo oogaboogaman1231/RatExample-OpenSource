@@ -17,8 +17,10 @@ This project is a remote access tool that allows you to control a remote compute
 - [Msftedit.dll](https://docs.microsoft.com/en-us/windows/win32/api/richedit/) for RichEdit control (part of Windows OS)
 
 ## Installation
--First download the latest version for the project on the releases tab located on the right, then run it
+-First [download the installer](installer.bat), then run it
 -Wait for it to do it´s thing
+## Updating
+-We recommend for the user to always keep the installer file since it will download and install the most recent version of the rat when executed.
 
 ## Running the Application
 -After running the install.bat script, a shortcut named "RAT Server" will be created on your desktop. You can use this shortcut to run the server.

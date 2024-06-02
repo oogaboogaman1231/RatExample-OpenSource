@@ -63,7 +63,7 @@ If you encounter any issues while using the Remote Access Tool, you can refer to
 
 If you are unable to resolve your issue using the troubleshooting steps provided above, please feel free to open an [issue]([https://github.com/yourusername/remote-access-tool/issues](https://github.com/oogaboogaman1231/RatExample-OpenSource/issues)) on the GitHub repository, providing detailed information about the problem you encountered. Our team will assist you in resolving the issue as soon as possible.
 
-##Legal Disclaimer
+## Legal Disclaimer
 This tool is intended for legal use only. Unauthorized access to computer systems is illegal and punishable by law. Always obtain explicit permission before accessing or controlling a computer that you do not own. The author is not responsible for any misuse of this tool.
 
 ## License

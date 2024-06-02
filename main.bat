@@ -1,5 +1,5 @@
 @echo off
-
+msg * "Open source edition, might/may be altered/tampered with by third-party authors. The official author is not liable for any damage caused or sustained by this tool and shall not be legally bothered. This may/might be the official version, but you can always check on the RatExample GitHub page."
 rem Install MinGW if not installed
 if not exist "%ProgramFiles%\mingw-w64" (
     echo Installing MinGW...

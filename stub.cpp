@@ -2,13 +2,18 @@
 #include <string>
 #include <winsock2.h>
 #include <windows.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
 
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "libcrypto.lib")
 
 #define AGENT_IP "127.0.0.1"
 #define AGENT_PORT 9999
 #define AGENT_PASSWORD "defaultpassword"
 
+// Function to connect to server
 SOCKET connectToServer(const std::string& ip, int port) {
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
@@ -35,6 +40,29 @@ SOCKET connectToServer(const std::string& ip, int port) {
     return serverSocket;
 }
 
+// Function to encrypt message using RSA public key
+std::string encryptMessage(const std::string& message, RSA* rsa) {
+    std::string encryptedMessage;
+    encryptedMessage.resize(RSA_size(rsa));
+    int result = RSA_public_encrypt(message.size(), (const unsigned char*)message.c_str(), (unsigned char*)&encryptedMessage[0], rsa, RSA_PKCS1_PADDING);
+    if (result == -1) {
+        ERR_print_errors_fp(stderr);
+        return "";
+    }
+    return encryptedMessage;
+}
+
+// Function to load public key from file
+RSA* loadPublicKey(const std::string& pubKeyFile) {
+    FILE* pubKeyFP = fopen(pubKeyFile.c_str(), "r");
+    if (pubKeyFP == nullptr) {
+        return nullptr;
+    }
+    RSA* rsa = PEM_read_RSA_PUBKEY(pubKeyFP, nullptr, nullptr, nullptr);
+    fclose(pubKeyFP);
+    return rsa;
+}
+
 int main() {
     SOCKET serverSocket = connectToServer(AGENT_IP, AGENT_PORT);
     if (serverSocket == INVALID_SOCKET) {
@@ -42,8 +70,25 @@ int main() {
         return 1;
     }
 
+    std::string pubKeyFile = "public.pem"; // Path to the server's public key file
+    RSA* rsa = loadPublicKey(pubKeyFile);
+    if (!rsa) {
+        std::cerr << "Failed to load public key" << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
     std::string password = AGENT_PASSWORD;
-    send(serverSocket, password.c_str(), password.length(), 0);
+    std::string encryptedPassword = encryptMessage(password, rsa);
+    if (encryptedPassword.empty()) {
+        std::cerr << "Failed to encrypt password" << std::endl;
+        closesocket(serverSocket);
+        WSACleanup();
+        return 1;
+    }
+
+    send(serverSocket, encryptedPassword.c_str(), encryptedPassword.length(), 0);
 
     char buffer[512];
     int result;
@@ -59,6 +104,7 @@ int main() {
         std::cerr << "Error receiving from server: " << error << std::endl;
     }
 
+    RSA_free(rsa);
     closesocket(serverSocket);
     WSACleanup();
     return 0;

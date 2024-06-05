@@ -1,4 +1,4 @@
-# Remote Access Tool V1.2.1A 🚨FIXED🚨
+# Remote Access Tool V1.2.0A 🚨SECURE🚨
 
 ## Overview
 This project is a remote access tool that allows you to control a remote computer. It supports various features such as remote desktop viewing, password recovery, and supports dynamic DNS services like ngrok and No-IP.
@@ -23,7 +23,7 @@ This project is a remote access tool that allows you to control a remote compute
 - Wait for it to do its thing
 
 ## Updating
-- We recommend for the user to always keep the installer file since it will download and install the most recent version of the rat when executed.
+- We recommend for the user to always keep the installer file since it will download and install the most recent version of the RAT when executed.
 
 ## Running the Application
 - After running the install.bat script, a shortcut named "RAT Server" will be created on your desktop. You can use this shortcut to run the server.
@@ -48,7 +48,7 @@ This project is a remote access tool that allows you to control a remote compute
 ### Build and Deploy the Agent
 1. **Enter Agent IP, Port, and Password:**
    - In the GUI, enter the IP address, port number, and password for the agent.
-2. **Generate Keys for Secure Communication:**
+2. **Generate RSA Keys for Secure Communication:**
    - Use OpenSSL to generate RSA keys:
      ```sh
      openssl genrsa -out private.pem 2048
@@ -65,6 +65,11 @@ This project is a remote access tool that allows you to control a remote compute
 ### Controlling the Agent
 - Use the server GUI to control the agent, view the remote desktop, and recover passwords.
 - All communication between the server and agent will be encrypted using the provided keys.
+
+## Changelog
+- **V1.2.0A:** Added support for secure communication using OpenSSL encryption.
+- **V1.1.2A:** Fixed various bugs and improved stability.
+- **V1.1.0A:** Added dynamic DNS support with ngrok and No-IP.
 
 ## Troubleshooting
 

